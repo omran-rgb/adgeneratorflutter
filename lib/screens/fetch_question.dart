@@ -1,3 +1,4 @@
+import 'package:adgenerator/functions.dart';
 import 'package:adgenerator/models/question_model.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
@@ -31,37 +32,6 @@ class _AdWizardScreenState extends State<AdWizardScreen> {
   }
 
   // دالة لجلب البيانات وتقسيمها لمجموعات
-  Future<Map<int, List<QuestionModel>>> fetchAndGroupQuestions() async {
-    // استبدل بالرابط الحقيقي
-    final url = Uri.parse('http://192.168.1.3:8000/api/questions');
-
-    try {
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        List<dynamic> data = json.decode(response.body);
-        List<QuestionModel> allQuestions =
-            data.map((json) => QuestionModel.fromJson(json)).toList();
-
-        // تجميع الأسئلة بناءً على group_id
-        Map<int, List<QuestionModel>> grouped = {};
-        for (var q in allQuestions) {
-          if (!grouped.containsKey(q.groupId)) {
-            grouped[q.groupId] = [];
-          }
-          grouped[q.groupId]!.add(q);
-        }
-
-        // ترتيب المجموعات للتأكد من تسلسلها (1, 2, 3...)
-        return Map.fromEntries(
-            grouped.entries.toList()..sort((a, b) => a.key.compareTo(b.key)));
-      } else {
-        throw Exception('Error loading data');
-      }
-    } catch (e) {
-      // بيانات وهمية للتجربة في حال فشل الاتصال
-      return _getDummyGroupedData();
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -323,14 +293,10 @@ class _AdWizardScreenState extends State<AdWizardScreen> {
     });
 
     try {
-      // 2. المحاولة الآن لتحويلها لـ JSON
       String jsonBody = jsonEncode(finalData);
-
       print("=== البيانات جاهزة للإرسال ===");
       print(jsonBody);
-
-      // هنا يتم استدعاء دالة الاتصال بالسيرفر
-      // _sendToLaravel(jsonBody);
+      _sendToLaravel(jsonBody);
     } catch (e) {
       print("خطأ في معالجة البيانات: $e");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -339,44 +305,40 @@ class _AdWizardScreenState extends State<AdWizardScreen> {
     }
   }
 
-  // دالة محاكاة بيانات مع مجموعات ونوع Check
-  Map<int, List<QuestionModel>> _getDummyGroupedData() {
-    // هذه البيانات للمحاكاة فقط
-    return {
-      1: [
-        QuestionModel(
-            id: 1,
-            groupId: 1,
-            title: "سؤال نصي 1",
-            content: "",
-            rawOptions: "",
-            type: "input"),
-        QuestionModel(
-            id: 2,
-            groupId: 1,
-            title: "سؤال راديو 1",
-            content: "",
-            rawOptions: "نعم;لا",
-            type: "radio"),
-      ],
-      2: [
-        QuestionModel(
-            id: 3,
-            groupId: 2,
-            title: "ما هي المنصات؟",
-            content: "اختر كل ما ينطبق",
-            rawOptions: "فيسبوك;انستجرام;تيك توك",
-            type: "check"),
-      ],
-      3: [
-        QuestionModel(
-            id: 4,
-            groupId: 3,
-            title: "الميزانية؟",
-            content: "",
-            rawOptions: "منخفضة;متوسطة;عالية",
-            type: "list"),
-      ]
-    };
+  Future<void> _sendToLaravel(String jsonBody) async {
+    final url = Uri.parse('http://192.168.1.3:8000/api/answars');
+
+    //try {
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonBody,
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم إرسال الإجابات بنجاح!')),
+      );
+      var jsonResponse = jsonDecode(response.body);
+      String adText = jsonResponse['ad_content'];
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text("الإعلان المولد"),
+          content: SingleChildScrollView(child: Text(adText)),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx), child: Text("حسناً"))
+          ],
+        ),
+      );
+    } else {
+      throw Exception('فشل السيرفر: ${response.statusCode}');
+    }
+    /* } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('فشل الاتصال: $e')),
+      );
+    }*/
   }
 }
